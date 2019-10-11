@@ -1,0 +1,369 @@
+﻿<Window
+    mc:Ignorable="d"
+    MinWidth="640" MinHeight="480"
+    Title="PostBoy"
+    Width="800" Height="600"
+    x:Class="PostBoy.MainWindow"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:PostBoy"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    Icon="postboy.ico"
+    >
+    <DockPanel Margin="3">
+        <!-- URL -->
+        <Grid DockPanel.Dock="Top" Height="30">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox
+                Grid.Column="0"
+                Margin="0,0,3,0"
+                Name="cbxMethod"
+                VerticalAlignment="Stretch"
+                VerticalContentAlignment="Center"
+                Width="80"
+                >
+                <ComboBoxItem IsSelected="True">GET</ComboBoxItem>
+                <ComboBoxItem>POST</ComboBoxItem>
+                <ComboBoxItem>PUT</ComboBoxItem>
+                <ComboBoxItem>PATCH</ComboBoxItem>
+                <ComboBoxItem>DELETE</ComboBoxItem>
+            </ComboBox>
+            <!-- URL TEXT -->
+            <TextBox
+                Grid.Column="1"
+                Name="tbxUrl"
+                VerticalContentAlignment="Center"
+                Text="https://www.google.com"
+            />
+            <!-- URL BUTTONS -->
+            <Button
+                Click="btnSendClick"
+                Grid.Column="2"
+                Margin="3,0,0,0"
+                Name="btnSend"
+                Padding="3,0,3,0"
+                Width="80"
+                >
+                <Label>_SEND</Label>
+            </Button>
+            <Button
+                Grid.Column="3"
+                Margin="3,0,0,0"
+                Padding="3,0,3,0"
+                Width="80"
+                >
+                <Label>SA_VE</Label>
+            </Button>
+            <Button
+                Grid.Column="4"
+                Margin="3,0,0,0"
+                Padding="3,0,3,0"
+                Width="80"
+                >
+                <Label>_LOAD</Label>
+            </Button>
+        </Grid>
+        <!-- REQUEST + RESPONSE -->
+        <Grid Margin="0,3,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="1*" />
+                <RowDefinition Height="1*" />
+            </Grid.RowDefinitions>
+            <!-- REQUEST -->
+            <TabControl Grid.Row="0">
+                <!-- REQUEST HEADER -->
+                <TabItem>
+                    <TabItem.Header>
+                        <TextBlock Width="80">HEADER</TextBlock>
+                    </TabItem.Header>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBox
+                            AcceptsReturn="True"
+                            FontFamily="Courier New"
+                            Grid.Row="1"
+                            Margin="0,3,0,0"
+                            Name="tbxRequestHeader"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.VerticalScrollBarVisibility="Visible"
+                            Text="Accept: */*"
+                        />
+                    </Grid>
+                </TabItem>
+                <!-- REQUEST BODY -->
+                <TabItem>
+                    <TabItem.Header>
+                        <TextBlock Width="80">BODY</TextBlock>
+                    </TabItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <ComboBox
+                            Grid.Column="0"
+                            Grid.Row="0"
+                            IsEditable="true"
+                            Margin="0,0,3,0"
+                            Name="cbxContentType"
+                            VerticalAlignment="Stretch"
+                            VerticalContentAlignment="Center"
+                            Width="150"
+                            >
+                            <ComboBoxItem IsSelected="true">application/json</ComboBoxItem>
+                            <ComboBoxItem>application/xml</ComboBoxItem>
+                        </ComboBox>
+                        <ComboBox
+                            Grid.Column="1"
+                            Grid.Row="0"
+                            IsEditable="true"
+                            Margin="0,0,3,0"
+                            Name="cbxCharset"
+                            VerticalAlignment="Stretch"
+                            VerticalContentAlignment="Center"
+                            Width="80"
+                            >
+                            <ComboBoxItem IsSelected="true">utf-8</ComboBoxItem>
+                            <ComboBoxItem>iso8859-1</ComboBoxItem>
+                        </ComboBox>
+                        <Button
+                            Click="btnRequestBodyBeautifyClick"
+                            Content="BEAUTIFY"
+                            Grid.Column="3"
+                            Grid.Row="0"
+                            Margin="3,0,0,0"
+                            Name="btnRequestBodyBeautify"
+                            Padding="3,0,3,0"
+                            Width="80"
+                        />
+                        <TextBox
+                            AcceptsReturn="True"
+                            FontFamily="Courier New"
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="4"
+                            Margin="0,3,0,0"
+                            Name="tbxRequestBody"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.VerticalScrollBarVisibility="Visible"
+                        />
+                    </Grid>
+                </TabItem>
+                <!-- WSDL -->
+                <TabItem>
+                    <TabItem.Header>
+                        <TextBlock Width="80">WSDL</TextBlock>
+                    </TabItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Button
+                            Click="btnWsdlParseClick"
+                            Content="PARSE"
+                            Grid.Column="1"
+                            Grid.Row="0"
+                            Margin="0,0,0,0"
+                            Name="btnWsdlParse"
+                            Padding="3,0,3,0"
+                            Width="80"
+                        />
+                        <ComboBox
+                            Grid.Column="2"
+                            Grid.Row="0"
+                            IsEnabled="false"
+                            Margin="3,0,0,0"
+                            Name="cbxWsdlOperation"
+                            SelectionChanged="cbxWsdlOperationSelectionChanged"
+                            VerticalAlignment="Stretch"
+                            VerticalContentAlignment="Center"
+                            Width="150"
+                        />
+                        <TextBox
+                            AcceptsReturn="True"
+                            FontFamily="Courier New"
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="3"
+                            Margin="0,3,0,0"
+                            Name="tbxWsdlContent"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.VerticalScrollBarVisibility="Visible"
+                        />
+                    </Grid>
+                </TabItem>
+            </TabControl>
+            <!-- RESPONSE -->
+            <TabControl Grid.Row="1">
+                <!-- RESPONSE HEADER -->
+                <TabItem Name="tbiResponseHeader">
+                    <TabItem.Header>
+                        <TextBlock Width="80">HEADER</TextBlock>
+                    </TabItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <!-- RESPONSE HEADER INFO -->
+                        <TextBlock
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            Margin="3,0,0,0"
+                            Name="tblResponseHeaderLeft"
+                            TextAlignment="Left"
+                            VerticalAlignment="Center"
+                        />
+                        <TextBlock
+                            Grid.Row="0"
+                            Grid.Column="2"
+                            Margin="0,0,3,0"
+                            Name="tblResponseHeaderRight"
+                            TextAlignment="Right"
+                            VerticalAlignment="Center"
+                        />
+                        <!-- RESPONSE HEADER CONTENT -->
+                        <TextBox
+                            AcceptsReturn="True"
+                            FontFamily="Courier New"
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="3"
+                            IsReadOnly="True"
+                            Margin="0,3,0,0"
+                            Name="tbxResponseHeader"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.VerticalScrollBarVisibility="Visible"
+                        />
+                    </Grid>
+                </TabItem>
+                <!-- RESPONSE BODY -->
+                <TabItem>
+                    <TabItem.Header>
+                        <TextBlock Width="80">BODY</TextBlock>
+                    </TabItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <!-- RESPONSE BODY INFO -->
+                        <TextBlock
+                            Grid.Column="0"
+                            Grid.Row="0"
+                            Margin="3,0,0,0"
+                            Name="tblResponseBodyLeft"
+                            TextAlignment="Left"
+                            VerticalAlignment="Center"
+                        />
+                        <ToggleButton
+                            Checked="tgbResponseBodyWrapChecked"
+                            Content="WRAP"
+                            Grid.Column="2"
+                            Grid.Row="0"
+                            Margin="0,0,3,0"
+                            Padding="3,0,3,0"
+                            Name="tgbResponseBodyWrap"
+                            Unchecked="tgbResponseBodyWrapUnchecked"
+                            Width="80"
+                        />
+                        <Button
+                            Click="btnResponseBodyBeautifyClick"
+                            Content="BEAUTIFY"
+                            Grid.Column="3"
+                            Grid.Row="0"
+                            Margin="3,0,0,0"
+                            Name="btnResponseBodyBeautify"
+                            Padding="3,0,3,0"
+                            Width="80"
+                        />
+                        <!-- RESPONSE BODY CONTENT -->
+                        <TextBox
+                            AcceptsReturn="True"
+                            FontFamily="Courier New"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="4"
+                            Grid.Row="1"
+                            IsReadOnly="True"
+                            Margin="0,3,0,0"
+                            Name="tbxResponseBody"
+                            ScrollViewer.HorizontalScrollBarVisibility="Visible"
+                            ScrollViewer.VerticalScrollBarVisibility="Visible"
+                        />
+                    </Grid>
+                </TabItem>
+                <!-- ERROR LOG -->
+                <TabItem Name="tbiLog">
+                    <TabItem.Header>
+                        <TextBlock Width="80">ERROR LOG</TextBlock>
+                    </TabItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Button
+                            Click="btnLogClearClick"
+                            Content="CLEAR"
+                            Grid.Column="1"
+                            Grid.Row="0"
+                            Margin="3,0,0,0"
+                            Name="btnLogClear"
+                            Padding="3,0,3,0"
+                            Width="80"
+                        />
+                        <TextBox
+                            AcceptsReturn="True"
+                            FontFamily="Courier New"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="2"
+                            Grid.Row="1"
+                            IsReadOnly="True"
+                            Margin="0,3,0,0"
+                            Name="tbxLog"
+                            ScrollViewer.HorizontalScrollBarVisibility="Visible"
+                            ScrollViewer.VerticalScrollBarVisibility="Visible"
+                        />
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </DockPanel>
+</Window>
