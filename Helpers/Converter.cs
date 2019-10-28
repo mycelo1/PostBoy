@@ -15,12 +15,12 @@ namespace PostBoy.Helpers
             return Uri.EscapeUriString(input);
         }
 
-        public static string FromBase64(string input, string charset)
+        public static string FromBase64(string input, string charset = "utf-8")
         {
             return Encoding.GetEncoding(charset).GetString(Convert.FromBase64String(input));
         }
 
-        public static string ToBase64(string input, string charset)
+        public static string ToBase64(string input, string charset = "utf-8")
         {
             return Convert.ToBase64String(Encoding.GetEncoding(charset).GetBytes(input));
         }

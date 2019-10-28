@@ -1,136 +1,111 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
-using System.Xml.Serialization;
-
-using PostBoy.Models;
+using System.Linq;
+using System.Xml;
+using System.Xml.Linq;
+using System.Xml.Schema;
+using Microsoft.Xml.XMLGen;
 
 namespace PostBoy.Helpers
 {
-    public static class WsdlParser
+    public class WsdlParser
     {
-        public static string[] Parse(string wsdl_text, ref WsdlRoot? wsdl_obj)
+        private const string NS_WSDL = "http://schemas.xmlsoap.org/wsdl/";
+        private const string NS_SOAP = "http://schemas.xmlsoap.org/wsdl/soap/";
+        private const string NS_XSD = "http://www.w3.org/2001/XMLSchema";
+        private const string NS_XSI = "http://www.w3.org/2001/XMLSchema-instance";
+        private const string NS_ENV = "http://schemas.xmlsoap.org/soap/envelope/";
+
+        protected string targetNamespace { get; }
+        protected XElement wsdl_object { get; }
+        protected XmlNamespaceManager xml_ns_mgr { get; }
+        protected Dictionary<string, string> namespaces { get; } = new Dictionary<string, string>();
+        public Dictionary<string, string> operations { get; } = new Dictionary<string, string>();
+
+        public WsdlParser(string wsdl_text)
         {
-            List<String> result = new List<string>();
-            XmlSerializer xml_serializer = new XmlSerializer(typeof(WsdlRoot));
             using StringReader reader = new StringReader(wsdl_text);
-            wsdl_obj = (WsdlRoot)xml_serializer.Deserialize(reader);
-            if (wsdl_obj?.Bindings != null)
+            wsdl_object = XElement.Parse(wsdl_text);
+            targetNamespace = wsdl_object.Attribute("targetNamespace").Value;
+            xml_ns_mgr = new XmlNamespaceManager(new NameTable());
+            xml_ns_mgr.AddNamespace("wsdl", NS_WSDL);
+            xml_ns_mgr.AddNamespace("soap", NS_SOAP);
+            xml_ns_mgr.AddNamespace("xsd", NS_XSD);
+            xml_ns_mgr.AddNamespace("tns", targetNamespace);
+            foreach (var attribute in
+                from attribute in wsdl_object.Attributes()
+                where attribute.IsNamespaceDeclaration && (!String.IsNullOrWhiteSpace(attribute.Name.NamespaceName))
+                select attribute)
             {
-                foreach (var binding in wsdl_obj.Bindings)
-                {
-                    var operations = binding.Operations;
-                    if ((operations != null) && (operations.Count > 0))
-                    {
-                        foreach (var operation in operations)
-                        {
-                            if (operation.Name != null)
-                            {
-                                result.Add(operation.Name);
-                            }
-                        }
-                        break;
-                    }
-                }
+                namespaces.Add(attribute.Name.LocalName, attribute.Name.NamespaceName);
             }
-            return result.ToArray();
+            foreach (var (xelement, soapAction) in
+                from XElement xelement in wsdl_object.XPathElements("/wsdl:binding[1]/wsdl:operation", xml_ns_mgr)
+                let xpath = xelement.XPathElements("./soap:operation[1]", xml_ns_mgr)
+                let soapAction = xpath.FirstOrDefault().Attribute("soapAction").Value
+                select (xelement, soapAction))
+            {
+                operations.Add(xelement.Attribute("name").LocalValue(namespaces.Keys).value, soapAction);
+            }
         }
 
-        //<?xml version="1.0" encoding="utf-8"?>
-        //<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-        //  <soap:Body>
-        //    <ConsultarBoletos xmlns="http://tempuri.org/">
-        //      <Cpf>string</Cpf>
-        //    </ConsultarBoletos>
-        //  </soap:Body>
-        //</soap:Envelope>
-        public static (string body, string soap_action) Build(WsdlRoot wsdl_obj, string operation, string charset)
+        public string BuildRequest(string operation)
         {
-            var ResultBody = new StringBuilder();
-            ResultBody.Append($"<?xml version=\"1.0\" encoding=\"{charset}\"?>");
-            ResultBody.Append("<soap:Envelope xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">");
-            ResultBody.Append("<soap:Body>");
-            ResultBody.Append($"<{operation}> xmlns=\"{wsdl_obj.TargetNamespace}\"");
+            // MESSAGE = portType/operation[].(name=OPERATION)/input.message
+            var operations = wsdl_object.XPathElements($"/wsdl:portType[1]/wsdl:operation[@name='{operation}']/wsdl:input[1]", xml_ns_mgr);
+            var input_message = operations.FirstOrDefault().Attribute("message").LocalValue(namespaces.Keys).value;
 
-            /*
-            MESSAGE = portType/operation[].(name=OPERATION)/input.message
-            ELEMENT = message[].(name=MESSAGE)/(part.(name="body")).element
-            FOREACH types.schema.element[].(name=ELEMENT)/complexType/sequence/element[]
-                NAME = .name
-                TYPE = .type
-                FOREACH types.schema.complexType[].(name=TYPE)/sequence/element[]
-                    NAME = .name
-                    TYPE = .type
-                    FOREACH types.schema.complexType[].(name=TYPE)/sequence/element[]
-                        NAME = .name
-                        TYPE = .type
-            */
+            // ELEMENT = message[].(name=MESSAGE)/(part.(name="body")).element
+            var messages = wsdl_object.XPathElements($"/wsdl:message[@name='{input_message}']/wsdl:part[@element]", xml_ns_mgr);
+            var (xsd_element, ns_prefix) = messages.FirstOrDefault().Attribute("element").LocalValue(namespaces.Keys);
 
-            ResultBody.Append($"</{operation}>");
-            ResultBody.Append("</soap:Body>");
-            ResultBody.Append("</soap:Envelope>");
+            using var stream_xmldom = new MemoryStream();
+            using var stream_schema = new MemoryStream();
+            using var stream_sample = new MemoryStream();
+            using var stream_xmlout = new MemoryStream();
+            using var stream_reader = new StreamReader(stream_xmlout, true);
 
-            return (ResultBody.ToString(), wsdl_obj.TargetNamespace + operation);
+            var xelement_schema = wsdl_object.XPathElements("/wsdl:types/xsd:schema[1]", xml_ns_mgr).FirstOrDefault();
+            xelement_schema.Save(stream_xmldom, SaveOptions.DisableFormatting);
 
-            string RemoveTNS(string value)
+            var xml_dom_schema = new XmlDocument();
+            stream_xmldom.Position = 0;
+            xml_dom_schema.Load(stream_xmldom);
+            xml_dom_schema.DocumentElement.SetAttribute($"xmlns:{ns_prefix}", targetNamespace);
+            xml_dom_schema.Save(stream_schema);
+
+            stream_schema.Position = 0;
+            var xml_schema = XmlSchema.Read(stream_schema, (s, v) => { throw new XmlSchemaException(v.Message); });
+            var generator = new XmlSampleGenerator(xml_schema, new XmlQualifiedName(xsd_element, targetNamespace));
+            generator.WriteXml(XmlWriter.Create(stream_sample));
+
+            var xml_dom_inner = new XmlDocument();
+            stream_sample.Position = 0;
+            xml_dom_inner.Load(stream_sample);
+
+            var xml_dom_outer = new XmlDocument() { PreserveWhitespace = false };
+            var elm_envelope = xml_dom_outer.CreateElement("soap", "Envelope", NS_ENV);
+            var elm_body = xml_dom_outer.CreateElement("soap", "Body", NS_ENV);
+            var elm_operation = xml_dom_outer.CreateElement(operation, targetNamespace);
+            foreach (var node in
+                from XmlNode? node in xml_dom_inner.DocumentElement.ChildNodes
+                where node!.NodeType == XmlNodeType.Element
+                select node)
             {
-                if (value.IndexOf(':') >= 0)
-                {
-                    return value.Split(':')[1];
-                }
-                else
-                {
-                    return value;
-                }
+                elm_operation.AppendChild(xml_dom_outer.ImportNode(node, true));
             }
+            elm_body.AppendChild(elm_operation);
+            elm_envelope.AppendChild(elm_body);
+            xml_dom_outer.AppendChild(elm_envelope);
+            xml_dom_outer.DocumentElement.SetAttribute("xmlns:xsi", NS_XSI);
+            xml_dom_outer.DocumentElement.SetAttribute("xmlns:xsd", NS_XSD);
+            xml_dom_outer.Save(stream_xmlout);
 
-            /*
-            WsdlMessage? FindMessage(string operation)
-            {
-                if (wsdl_obj?.Messages?.Count > 0)
-                {
-                    foreach (var message in wsdl_obj.Messages)
-                    {
-                        if (element?.Name == RemoveTNS(element_name))
-                        {
-                            return element;
-                        }
-                    }
-                }
-                return null;
-            }
-            */
+            stream_xmlout.Position = 0;
+            var xml_string = stream_reader.ReadToEnd();
 
-            WsdlElement? FindElement(string element_name)
-            {
-                if (wsdl_obj?.Types?.Schema?.Elements?.Count > 0)
-                {
-                    foreach (var element in wsdl_obj.Types.Schema.Elements)
-                    {
-                        if (element?.Name == RemoveTNS(element_name))
-                        {
-                            return element;
-                        }
-                    }
-                }
-                return null;
-            }
-
-            WsdlComplexType? FindType(string type_name)
-            {
-                if (wsdl_obj?.Types?.Schema?.ComplexTypes?.Count > 0)
-                {
-                    foreach (var complex_type in wsdl_obj.Types.Schema.ComplexTypes)
-                    {
-                        if (complex_type?.Name == RemoveTNS(type_name))
-                        {
-                            return complex_type;
-                        }
-                    }
-                }
-                return null;
-            }
+            return xml_string;
         }
     }
 }
