@@ -1,4 +1,5 @@
 ﻿<Window
+    Icon="postboy.ico"
     mc:Ignorable="d"
     MinWidth="640" MinHeight="480"
     Title="PostBoy"
@@ -9,7 +10,6 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    Icon="postboy.ico"
     >
     <Window.Resources>
         <ContextMenu x:Key="TextBoxContextMenu">
@@ -19,15 +19,19 @@
             <MenuItem Command="ApplicationCommands.SelectAll" />
             <MenuItem Command="ApplicationCommands.Undo" />
             <Separator />
+            <MenuItem Click="evtTextBoxMenuItemClick" Header="Cut All" Name="mniCutAll" />
             <MenuItem Click="evtTextBoxMenuItemClick" Header="Copy All" Name="mniCopyAll" />
             <MenuItem Click="evtTextBoxMenuItemClick" Header="Paste Over" Name="mniPasteOver" />
-            <MenuItem Click="evtTextBoxMenuItemClick" Header="Clean" Name="mniClean" />
+            <MenuItem Click="evtTextBoxMenuItemClick" Header="Clear" Name="mniClear" />
             <Separator />
             <MenuItem Click="evtTextBoxMenuItemClick" Header="Base64 Encode" Name="mniB64Encode" />
             <MenuItem Click="evtTextBoxMenuItemClick" Header="Base64 Decode" Name="mniB64Decode" />
             <Separator />
             <MenuItem Click="evtTextBoxMenuItemClick" Header="URI% Encode" Name="mniUriEncode" />
             <MenuItem Click="evtTextBoxMenuItemClick" Header="URI% Decode" Name="mniUriDecode" />
+            <Separator />
+            <MenuItem Click="evtTextBoxMenuItemClick" Header="Beautify XML" Name="mniBeautifyXml" />
+            <MenuItem Click="evtTextBoxMenuItemClick" Header="Beautify Json" Name="mniBeautifyJson" />
         </ContextMenu>
         <Style TargetType="{x:Type TextBox}">
             <Setter Property="ContextMenu" Value="{StaticResource TextBoxContextMenu}" />
@@ -87,6 +91,8 @@
                 <Label>SAVE</Label>
             </Button>
             <Button
+                AllowDrop="true"
+                Drop="evtDropLoadJson"
                 Click="btnLoadClick"
                 Grid.Column="4"
                 Margin="3,0,0,0"
@@ -176,16 +182,6 @@
                             <ComboBoxItem IsSelected="true">utf-8</ComboBoxItem>
                             <ComboBoxItem>iso8859-1</ComboBoxItem>
                         </ComboBox>
-                        <Button
-                            Click="btnRequestBodyBeautifyClick"
-                            Content="BEAUTIFY"
-                            Grid.Column="3"
-                            Grid.Row="0"
-                            Margin="3,0,0,0"
-                            Name="btnRequestBodyBeautify"
-                            Padding="3,0,3,0"
-                            Width="80"
-                        />
                         <TextBox
                             AcceptsReturn="True"
                             FontFamily="Courier New"
@@ -344,20 +340,10 @@
                             Content="WRAP"
                             Grid.Column="2"
                             Grid.Row="0"
-                            Margin="0,0,3,0"
+                            Margin="0,0,0,0"
                             Padding="3,0,3,0"
                             Name="tgbResponseBodyWrap"
                             Unchecked="tgbResponseBodyWrapUnchecked"
-                            Width="80"
-                        />
-                        <Button
-                            Click="btnResponseBodyBeautifyClick"
-                            Content="BEAUTIFY"
-                            Grid.Column="3"
-                            Grid.Row="0"
-                            Margin="3,0,0,0"
-                            Name="btnResponseBodyBeautify"
-                            Padding="3,0,3,0"
                             Width="80"
                         />
                         <!-- RESPONSE BODY CONTENT -->

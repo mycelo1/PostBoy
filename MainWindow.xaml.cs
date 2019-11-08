@@ -80,29 +80,6 @@ namespace PostBoy
 
         void btnSaveClick(object sender, RoutedEventArgs e)
         {
-            var state = new State()
-            {
-                config = new State.Config()
-                {
-                    version = app_version
-                },
-                request = new State.Transaction()
-                {
-                    method = cbxMethod.Text,
-                    url = tbxUrl.Text,
-                    content_type = cbxContentType.Text,
-                    charset = cbxCharset.Text,
-                    header = tbxRequestHeader.Text,
-                    body = tbxRequestBody.Text
-                },
-                response = new State.Transaction()
-                {
-                    content_type = response_content_type,
-                    header = tbxResponseHeader.Text,
-                    body = tbxResponseBody.Text
-                }
-            };
-
             var dialog = new SaveFileDialog()
             {
                 DefaultExt = ".json",
@@ -111,16 +88,7 @@ namespace PostBoy
 
             if (dialog.ShowDialog() ?? false)
             {
-                try
-                {
-                    using var file_stream = new FileStream(dialog.FileName, FileMode.Create);
-                    using var json_stream = new Utf8JsonWriter(file_stream);
-                    JsonSerializer.Serialize<State>(json_stream, state, new JsonSerializerOptions() { IgnoreNullValues = true });
-                }
-                catch (Exception exception)
-                {
-                    WriteLog(exception.Message);
-                }
+                SaveJson(dialog.FileName);
             }
         }
 
@@ -134,27 +102,7 @@ namespace PostBoy
 
             if (dialog.ShowDialog() ?? false)
             {
-                try
-                {
-                    using var file_stream = new FileStream(dialog.FileName, FileMode.Open);
-                    using var json_stream = new Utf8JsonStreamReader(file_stream);
-                    json_stream.Read();
-                    var state = json_stream.Deserialize<State>();
-                    response_content_type = state?.response?.content_type ?? String.Empty;
-                    cbxMethod.Text = state?.request?.method ?? String.Empty;
-                    tbxUrl.Text = state?.request?.url ?? String.Empty;
-                    cbxContentType.Text = state?.request?.content_type ?? String.Empty;
-                    cbxCharset.Text = state?.request?.charset ?? String.Empty;
-                    tbxRequestHeader.Text = state?.request?.header ?? String.Empty;
-                    tbxRequestBody.Text = state?.request?.body ?? String.Empty;
-                    tblResponseBodyLeft.Text = response_content_type;
-                    tbxResponseHeader.Text = state?.response?.header ?? String.Empty;
-                    tbxResponseBody.Text = state?.response?.body ?? String.Empty;
-                }
-                catch (Exception exception)
-                {
-                    WriteLog(exception.Message);
-                }
+                LoadJson(dialog.FileName);
             }
         }
 
@@ -168,19 +116,6 @@ namespace PostBoy
         {
             tbxResponseBody.TextWrapping = TextWrapping.NoWrap;
             tbxResponseBody.HorizontalScrollBarVisibility = ScrollBarVisibility.Visible;
-        }
-
-        void btnRequestBodyBeautifyClick(object sender, RoutedEventArgs e)
-        {
-            tbxRequestBody.Text = Beautify(cbxContentType.Text, tbxRequestBody.Text);
-        }
-
-        void btnResponseBodyBeautifyClick(object sender, RoutedEventArgs e)
-        {
-            if (!String.IsNullOrWhiteSpace(response_content_type))
-            {
-                tbxResponseBody.Text = Beautify(response_content_type, tbxResponseBody.Text);
-            }
         }
 
         void btnLogClearClick(object sender, RoutedEventArgs e)
@@ -292,6 +227,10 @@ namespace PostBoy
 
             switch (menu_item.Name)
             {
+                case "mniCutAll":
+                    text_box.SelectAll();
+                    text_box.Cut();
+                    break;
                 case "mniCopyAll":
                     text_box.SelectAll();
                     text_box.Copy();
@@ -301,7 +240,7 @@ namespace PostBoy
                     text_box.Paste();
                     text_box.SelectAll();
                     break;
-                case "mniClean":
+                case "mniClear":
                     text_box.Clear();
                     break;
                 case "mniB64Encode":
@@ -316,6 +255,21 @@ namespace PostBoy
                 case "mniUriDecode":
                     _ProcessText(x => { return Converter.FromUrlEncode(x); });
                     break;
+                case "mniBeautifyXml":
+                    _ProcessText(x => { return Beautifier.Xml(x); });
+                    break;
+                case "mniBeautifyJson":
+                    _ProcessText(x => { return Beautifier.Json(x); });
+                    break;
+            }
+        }
+
+        void evtDropLoadJson(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var file_name = ((string[])(e.Data.GetData(DataFormats.FileDrop))).FirstOrDefault();
+                LoadJson(file_name);
             }
         }
 
@@ -340,6 +294,68 @@ namespace PostBoy
             {
                 WriteLog(exception.Message);
                 return input;
+            }
+        }
+
+        private void LoadJson(string file_name)
+        {
+            try
+            {
+                using var file_stream = new FileStream(file_name, FileMode.Open);
+                using var json_stream = new Utf8JsonStreamReader(file_stream);
+                json_stream.Read();
+                var state = json_stream.Deserialize<State>();
+                response_content_type = state?.response?.content_type ?? String.Empty;
+                cbxMethod.Text = state?.request?.method ?? String.Empty;
+                tbxUrl.Text = state?.request?.url ?? String.Empty;
+                cbxContentType.Text = state?.request?.content_type ?? String.Empty;
+                cbxCharset.Text = state?.request?.charset ?? String.Empty;
+                tbxRequestHeader.Text = state?.request?.header ?? String.Empty;
+                tbxRequestBody.Text = state?.request?.body ?? String.Empty;
+                tblResponseBodyLeft.Text = response_content_type;
+                tbxResponseHeader.Text = state?.response?.header ?? String.Empty;
+                tbxResponseBody.Text = state?.response?.body ?? String.Empty;
+            }
+            catch (Exception exception)
+            {
+                WriteLog(exception.Message);
+            }
+        }
+
+        private void SaveJson(string file_name)
+        {
+            var state = new State()
+            {
+                config = new State.Config()
+                {
+                    version = app_version
+                },
+                request = new State.Transaction()
+                {
+                    method = cbxMethod.Text,
+                    url = tbxUrl.Text,
+                    content_type = cbxContentType.Text,
+                    charset = cbxCharset.Text,
+                    header = tbxRequestHeader.Text,
+                    body = tbxRequestBody.Text
+                },
+                response = new State.Transaction()
+                {
+                    content_type = response_content_type,
+                    header = tbxResponseHeader.Text,
+                    body = tbxResponseBody.Text
+                }
+            };
+
+            try
+            {
+                using var file_stream = new FileStream(file_name, FileMode.Create);
+                using var json_stream = new Utf8JsonWriter(file_stream);
+                JsonSerializer.Serialize<State>(json_stream, state, new JsonSerializerOptions() { IgnoreNullValues = true });
+            }
+            catch (Exception exception)
+            {
+                WriteLog(exception.Message);
             }
         }
 
