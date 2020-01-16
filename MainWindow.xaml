@@ -60,6 +60,7 @@
                 <ComboBoxItem>PUT</ComboBoxItem>
                 <ComboBoxItem>PATCH</ComboBoxItem>
                 <ComboBoxItem>DELETE</ComboBoxItem>
+                <ComboBoxItem>HEAD</ComboBoxItem>
             </ComboBox>
             <!-- URL TEXT -->
             <TextBox

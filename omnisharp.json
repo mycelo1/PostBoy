@@ -1,0 +1,16 @@
+﻿{
+    "fileOptions": {
+        "excludeSearchPatterns": [
+            "**/obj/**/*.cs",
+            "**/bin/**/*.cs"
+        ],
+        "userExcludeSearchPatterns": [
+            "**/obj/**/*.cs",
+            "**/bin/**/*.cs"
+        ],
+        "systemExcludeSearchPatterns": [
+            "**/obj/**/*.cs",
+            "**/bin/**/*.cs"
+        ]
+    }
+}

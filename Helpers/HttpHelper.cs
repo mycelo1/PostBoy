@@ -6,9 +6,12 @@ using System.Text;
 
 namespace PostBoy.Helpers
 {
-    public static class HttpHelper
+    public class HttpHelper
     {
-        public static (int status, string header, string content_type, string body) Request(string method, string url, string header, string content_type, string charset, string? body)
+        public int? timeout { get; set; }
+        public string? proxy_address { get; set; }
+
+        public (int status, string header, string content_type, string body) Request(string method, string url, string header, string content_type, string charset, string? body)
         {
             byte[]? v_request_bytes = null;
             HttpWebRequest v_web_request;
@@ -21,6 +24,23 @@ namespace PostBoy.Helpers
             Uri v_uri = new Uri(url);
             v_web_request = (HttpWebRequest)WebRequest.Create(v_uri);
             v_web_request.Method = method;
+
+            if (timeout != null)
+            {
+                v_web_request.Timeout = (int)timeout;
+            }
+
+            if (!String.IsNullOrEmpty(proxy_address))
+            {
+                if (proxy_address == "+")
+                {
+                    v_web_request.Proxy = null;
+                }
+                else
+                {
+                    v_web_request.Proxy = new WebProxy(proxy_address);
+                }
+            }
 
             foreach (var header_line in header.Split(new string[] { "\n\r", "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries))
             {

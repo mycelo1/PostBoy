@@ -3,7 +3,7 @@
 namespace PostBoy.Models
 {
     [Serializable]
-    public sealed class State
+    public sealed class SaveState
     {
         public Config? config { get; set; }
         public Transaction? request { get; set; }

@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
 using Microsoft.Win32;
 
 using PostBoy.Helpers;
@@ -19,55 +20,84 @@ namespace PostBoy
 {
     public partial class MainWindow : Window
     {
-        private string app_version;
-        private string response_content_type = String.Empty;
-        private WsdlParser? wsdl_parser;
+        private SynchronizationContext originalContext { get; }
+        protected string app_version { get; }
+        protected WsdlParser? wsdl_parser { get; set; }
+        protected int? timeout { get; set; }
+        protected string? proxy_address { get; set; }
+        protected string response_content_type { get; set; } = String.Empty;
+
+        private enum StateItem
+        {
+            Timeout,
+            ProxyAddress,
+            Method,
+            Url,
+            RequestContentType,
+            RequestCharset,
+            RequestHeader,
+            RequestBody,
+            ResponseStatus,
+            ResponseContentType,
+            ResponseCharset,
+            ResponseHeader,
+            ResponseBody,
+            WsdlParser,
+            WsdlContent,
+            WsdlOperation,
+            FileName,
+            SaveState
+        }
+
+        private class AsyncState : Dictionary<StateItem, object?> { }
 
         public MainWindow()
         {
             InitializeComponent();
+            originalContext = SynchronizationContext.Current!;
             app_version = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? String.Empty;
             this.Title = $"PostBoy v{app_version}";
         }
 
         void btnGoClick(object sender, RoutedEventArgs e)
         {
-            void _Action()
+            static void _PreAction(MainWindow mw, AsyncState async_state)
             {
-                string? method = null;
-                string? url = null;
-                string? request_header = null;
-                string? request_body = null;
-                string? content_type = null;
-                string? charset = null;
-
-                Dispatcher.Invoke(DispatcherPriority.Normal, (Action)(() =>
+                async_state[StateItem.Timeout] = mw.timeout;
+                async_state[StateItem.ProxyAddress] = mw.proxy_address;
+                async_state[StateItem.Method] = mw.cbxMethod.Text;
+                async_state[StateItem.Url] = mw.tbxUrl.Text;
+                async_state[StateItem.RequestHeader] = mw.tbxRequestHeader.Text;
+                async_state[StateItem.RequestBody] = mw.tbxRequestBody.Text;
+                async_state[StateItem.RequestContentType] = mw.cbxContentType.Text;
+                async_state[StateItem.RequestCharset] = mw.cbxCharset.Text;
+            }
+            static void _Action(AsyncState async_state)
+            {
+                var http_helper = new HttpHelper()
                 {
-                    response_content_type = String.Empty;
-                    method = cbxMethod.Text;
-                    url = tbxUrl.Text;
-                    request_header = tbxRequestHeader.Text;
-                    request_body = tbxRequestBody.Text;
-                    content_type = cbxContentType.Text;
-                    charset = cbxCharset.Text;
-                }));
-
-                var response = HttpHelper.Request(
-                    method: method!,
-                    url: url!,
-                    header: request_header!,
-                    content_type: content_type!,
-                    charset: charset!,
-                    body: request_body);
-
-                Dispatcher.Invoke(DispatcherPriority.Normal, (Action)(() =>
-                {
-                    response_content_type = response.content_type;
-                    tblResponseHeaderLeft.Text = $"HTTP: {response.status}";
-                    tblResponseBodyLeft.Text = response_content_type;
-                    tbxResponseHeader.Text = response.header;
-                    tbxResponseBody.Text = response.body;
-                }));
+                    timeout = (int?)(async_state[StateItem.Timeout]),
+                    proxy_address = (string?)(async_state[StateItem.ProxyAddress])
+                };
+                var response = http_helper.Request(
+                    method: (async_state[StateItem.Method] as string)!,
+                    url: (async_state[StateItem.Url] as string)!,
+                    header: (async_state[StateItem.RequestHeader] as string)!,
+                    content_type: (async_state[StateItem.RequestContentType] as string)!,
+                    charset: (async_state[StateItem.RequestCharset] as string)!,
+                    body: async_state[StateItem.RequestBody] as string);
+                async_state[StateItem.ResponseStatus] = response.status;
+                async_state[StateItem.ResponseHeader] = response.header;
+                async_state[StateItem.ResponseContentType] = response.content_type;
+                async_state[StateItem.ResponseBody] = response.body;
+            }
+            static void _PostAction(MainWindow mw, AsyncState async_state)
+            {
+                mw.response_content_type = (async_state[StateItem.ResponseContentType] as string)!;
+                mw.tblResponseHeaderLeft.Text = $"HTTP: {async_state[StateItem.ResponseStatus]!}";
+                mw.tblResponseBodyLeft.Text = mw.response_content_type;
+                mw.tbxResponseHeader.Text = (async_state[StateItem.ResponseHeader] as string)!;
+                mw.tbxResponseBody.Text = (async_state[StateItem.ResponseBody] as string)!;
             }
 
             tblResponseHeaderLeft.Text = String.Empty;
@@ -75,7 +105,8 @@ namespace PostBoy
             tbxResponseHeader.Text = String.Empty;
             tbxResponseBody.Text = String.Empty;
 
-            MakeAction(_Action);
+            var async_state = new AsyncState();
+            _ = AsyncRun(async_state, _PreAction, _Action, _PostAction);
         }
 
         void btnSaveClick(object sender, RoutedEventArgs e)
@@ -125,63 +156,61 @@ namespace PostBoy
 
         void btnWsdlParseClick(object sender, RoutedEventArgs e)
         {
-            void _Action()
+            static void _PreAction(MainWindow mw, AsyncState async_state)
             {
-                string? wsdl_content = null;
-                Dispatcher.Invoke(DispatcherPriority.Normal, (Action)(() =>
+                async_state[StateItem.WsdlContent] = mw.tbxWsdlContent.Text;
+            }
+            static void _Action(AsyncState async_state)
+            {
+                async_state[StateItem.WsdlParser] = new WsdlParser((async_state[StateItem.WsdlContent] as string)!);
+            }
+            static void _PostAction(MainWindow mw, AsyncState async_state)
+            {
+                var wsdl_parser = (async_state[StateItem.WsdlParser] as WsdlParser)!;
+                if (wsdl_parser.operations.Count > 0)
                 {
-                    wsdl_content = tbxWsdlContent.Text;
-                }));
-                var _wsdl_parser = new WsdlParser(wsdl_content!);
-                if (_wsdl_parser.operations.Count > 0)
-                {
-                    var items = new string[_wsdl_parser.operations.Count + 1];
+                    var items = new string[wsdl_parser.operations.Count + 1];
                     items[0] = "(select)";
-                    Array.Copy(_wsdl_parser.operations.Keys.ToArray(), 0, items, 1, _wsdl_parser.operations.Count);
-                    Dispatcher.Invoke(DispatcherPriority.Normal, (Action)(() =>
-                    {
-                        wsdl_parser = _wsdl_parser;
-                        cbxWsdlOperation.ItemsSource = items;
-                        cbxWsdlOperation.SelectedIndex = 0;
-                        cbxWsdlOperation.IsEnabled = true;
-                        tbxWsdlContent.Clear();
-                    }));
+                    Array.Copy(wsdl_parser.operations.Keys.ToArray(), 0, items, 1, wsdl_parser.operations.Count);
+                    mw.wsdl_parser = wsdl_parser;
+                    mw.cbxWsdlOperation.ItemsSource = items;
+                    mw.cbxWsdlOperation.SelectedIndex = 0;
+                    mw.cbxWsdlOperation.IsEnabled = true;
+                    mw.tbxWsdlContent.Clear();
                 }
             }
             cbxWsdlOperation.ClearValue(ItemsControl.ItemsSourceProperty);
             cbxWsdlOperation.IsEnabled = false;
-            MakeAction(_Action);
+            var async_state = new AsyncState();
+            _ = AsyncRun(async_state, _PreAction, _Action, _PostAction);
         }
 
         void cbxWsdlOperationDropDownClosed(object sender, EventArgs e)
         {
-            void _Action()
+            static void _PreAction(MainWindow mw, AsyncState async_state)
             {
-                string? wsdl_operation = null;
-                string? soap_action = null;
-                string? request_body = null;
-                WsdlParser? _wsdl_parser = null;
-
-                Dispatcher.Invoke(DispatcherPriority.Normal, (Action)(() =>
-                {
-                    wsdl_operation = cbxWsdlOperation.Text;
-                    soap_action = wsdl_parser!.operations[wsdl_operation];
-                    _wsdl_parser = wsdl_parser;
-                }));
-
-                request_body = _wsdl_parser!.BuildRequest(wsdl_operation!);
-
-                Dispatcher.Invoke(DispatcherPriority.Normal, (Action)(() =>
-                {
-                    tbxRequestHeader.Text = $"SOAPAction: \"{soap_action}\"\n";
-                    tbxRequestBody.Text = request_body;
-                    cbxContentType.Text = "text/xml";
-                    cbxCharset.Text = "utf-8";
-                }));
+                async_state[StateItem.WsdlParser] = mw.wsdl_parser!;
+                async_state[StateItem.WsdlOperation] = mw.cbxWsdlOperation.Text;
+            }
+            void _Action(AsyncState async_state)
+            {
+                var wsdl_parser = (async_state[StateItem.WsdlParser] as WsdlParser)!;
+                var wsdl_operation = (async_state[StateItem.WsdlOperation] as string)!;
+                async_state[StateItem.RequestBody] = wsdl_parser.BuildRequest(wsdl_operation);
+            }
+            static void _PostAction(MainWindow mw, AsyncState async_state)
+            {
+                var wsdl_parser = (async_state[StateItem.WsdlParser] as WsdlParser)!;
+                var wsdl_operation = (async_state[StateItem.WsdlOperation] as string)!;
+                mw.tbxRequestHeader.Text = $"SOAPAction: \"{wsdl_parser.operations[wsdl_operation]}\"\n";
+                mw.tbxRequestBody.Text = (async_state[StateItem.RequestBody] as string);
+                mw.cbxContentType.Text = "text/xml";
+                mw.cbxCharset.Text = "utf-8";
             }
             if ((wsdl_parser != null) && (cbxWsdlOperation.IsEnabled) && (cbxWsdlOperation.SelectedIndex > 0))
             {
-                MakeAction(_Action);
+                var async_state = new AsyncState();
+                _ = AsyncRun(async_state, _PreAction, _Action, _PostAction);
             }
         }
 
@@ -299,83 +328,109 @@ namespace PostBoy
 
         private void LoadJson(string file_name)
         {
-            try
+            static void _Action(AsyncState async_state)
             {
-                using var file_stream = new FileStream(file_name, FileMode.Open);
+                using var file_stream = new FileStream((async_state[StateItem.FileName] as string)!, FileMode.Open);
                 using var json_stream = new Utf8JsonStreamReader(file_stream);
                 json_stream.Read();
-                var state = json_stream.Deserialize<State>();
-                response_content_type = state?.response?.content_type ?? String.Empty;
-                cbxMethod.Text = state?.request?.method ?? String.Empty;
-                tbxUrl.Text = state?.request?.url ?? String.Empty;
-                cbxContentType.Text = state?.request?.content_type ?? String.Empty;
-                cbxCharset.Text = state?.request?.charset ?? String.Empty;
-                tbxRequestHeader.Text = state?.request?.header ?? String.Empty;
-                tbxRequestBody.Text = state?.request?.body ?? String.Empty;
-                tblResponseBodyLeft.Text = response_content_type;
-                tbxResponseHeader.Text = state?.response?.header ?? String.Empty;
-                tbxResponseBody.Text = state?.response?.body ?? String.Empty;
+                async_state[StateItem.SaveState] = json_stream.Deserialize<SaveState>();
             }
-            catch (Exception exception)
+            static void _PostAction(MainWindow mw, AsyncState async_state)
             {
-                WriteLog(exception.Message);
+                var save_state = async_state[StateItem.SaveState] as SaveState;
+                mw.timeout = save_state?.config?.timeout;
+                mw.proxy_address = save_state?.config?.proxy_address;
+                mw.response_content_type = save_state?.response?.content_type ?? String.Empty;
+                mw.cbxMethod.Text = save_state?.request?.method ?? String.Empty;
+                mw.tbxUrl.Text = save_state?.request?.url ?? String.Empty;
+                mw.cbxContentType.Text = save_state?.request?.content_type ?? String.Empty;
+                mw.cbxCharset.Text = save_state?.request?.charset ?? String.Empty;
+                mw.tbxRequestHeader.Text = save_state?.request?.header ?? String.Empty;
+                mw.tbxRequestBody.Text = save_state?.request?.body ?? String.Empty;
+                mw.tblResponseBodyLeft.Text = mw.response_content_type;
+                mw.tbxResponseHeader.Text = save_state?.response?.header ?? String.Empty;
+                mw.tbxResponseBody.Text = save_state?.response?.body ?? String.Empty;
             }
+            var async_state = new AsyncState() { [StateItem.FileName] = file_name };
+            _ = AsyncRun(async_state, delegate {}, _Action, _PostAction);
         }
 
         private void SaveJson(string file_name)
         {
-            var state = new State()
+            static void _PreAction(MainWindow mw, AsyncState async_state)
             {
-                config = new State.Config()
+                async_state[StateItem.SaveState] = new SaveState()
                 {
-                    version = app_version
-                },
-                request = new State.Transaction()
-                {
-                    method = cbxMethod.Text,
-                    url = tbxUrl.Text,
-                    content_type = cbxContentType.Text,
-                    charset = cbxCharset.Text,
-                    header = tbxRequestHeader.Text,
-                    body = tbxRequestBody.Text
-                },
-                response = new State.Transaction()
-                {
-                    content_type = response_content_type,
-                    header = tbxResponseHeader.Text,
-                    body = tbxResponseBody.Text
-                }
-            };
-
-            try
+                    config = new SaveState.Config()
+                    {
+                        version = mw.app_version,
+                        timeout = mw.timeout,
+                        proxy_address = mw.proxy_address
+                    },
+                    request = new SaveState.Transaction()
+                    {
+                        method = mw.cbxMethod.Text,
+                        url = mw.tbxUrl.Text,
+                        content_type = mw.cbxContentType.Text,
+                        charset = mw.cbxCharset.Text,
+                        header = mw.tbxRequestHeader.Text,
+                        body = mw.tbxRequestBody.Text
+                    },
+                    response = new SaveState.Transaction()
+                    {
+                        content_type = mw.response_content_type,
+                        header = mw.tbxResponseHeader.Text,
+                        body = mw.tbxResponseBody.Text
+                    }
+                };
+            }
+            static void _Action(AsyncState async_state)
             {
-                using var file_stream = new FileStream(file_name, FileMode.Create);
+                var save_state = (async_state[StateItem.SaveState] as SaveState)!;
+                using var file_stream = new FileStream((async_state[StateItem.FileName] as string)!, FileMode.Create);
                 using var json_stream = new Utf8JsonWriter(file_stream);
-                JsonSerializer.Serialize<State>(json_stream, state, new JsonSerializerOptions() { IgnoreNullValues = true });
+                JsonSerializer.Serialize<SaveState>(json_stream, save_state, new JsonSerializerOptions() { IgnoreNullValues = true });
             }
-            catch (Exception exception)
-            {
-                WriteLog(exception.Message);
-            }
+            var async_state = new AsyncState() { [StateItem.FileName] = file_name };
+            _ = AsyncRun(async_state, _PreAction, _Action, delegate { });
         }
 
-        private async void MakeAction(Action action)
+        private async Task AsyncRun(
+            AsyncState async_state,
+            Action<MainWindow, AsyncState> pre_action,
+            Action<AsyncState> action,
+            Action<MainWindow, AsyncState> post_action)
         {
-            IsEnabled = false;
-            Mouse.OverrideCursor = Cursors.Wait;
-
-            try
+            void _PreWork()
             {
-                await Task.Run(() => { action(); });
+                IsEnabled = false;
+                Mouse.OverrideCursor = Cursors.Wait;
             }
-            catch (Exception exception)
-            {
-                WriteLog(exception.Message);
-            }
-            finally
+            void _PostWork()
             {
                 Mouse.OverrideCursor = null;
                 IsEnabled = true;
+            }
+            void _Exception(object? exception)
+            {
+                WriteLog((exception as Exception)!.Message);
+            }
+            //
+            await Task.Delay(0).ConfigureAwait(false);
+            originalContext.Send(delegate { _PreWork(); }, null);
+            try
+            {
+                originalContext.Send(delegate { lock (async_state) { pre_action(this, async_state); } }, null);
+                await Task.Run(() => { lock (async_state) { action(async_state); } }).ConfigureAwait(false);
+                originalContext.Send(delegate { lock (async_state) { post_action(this, async_state); } }, null);
+            }
+            catch (Exception exception)
+            {
+                originalContext.Post(_Exception, exception);
+            }
+            finally
+            {
+                originalContext.Post(delegate { _PostWork(); }, null);
             }
         }
 
